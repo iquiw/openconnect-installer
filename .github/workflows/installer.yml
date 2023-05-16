@@ -9,25 +9,32 @@ jobs:
   build:
     name: Build OpenConnect
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [ mingw64, mingw32 ]
     container:
-      image: registry.gitlab.com/openconnect/build-images:openconnect-cli-mingw64
+      image: registry.gitlab.com/openconnect/build-images:openconnect-cli-${{ matrix.arch }}
       options: --privileged
     env:
-      OPENCONNECT_VERSION: '9.10'
+      OPENCONNECT_VERSION: 'v9.10'
     steps:
       - name: Clone
         run: |
           # Use Git respository as tarball does not include some necessary file "wintun.h".
-          git clone -b v${{ env.OPENCONNECT_VERSION }} --depth 1 https://gitlab.com/openconnect/openconnect.git
+          git clone -b ${{ env.OPENCONNECT_VERSION }} --depth 1 https://gitlab.com/openconnect/openconnect.git
           mkdir home
+
+      - name: Remove wine.i686
+        if: matrix.arch == 'mingw64'
+        run: |
+          dnf remove -y wine.i686
 
       - name: Build
         run: |
-          dnf remove -y wine.i686
           mount -t binfmt_misc binfmt_misc /proc/sys/fs/binfmt_misc
           echo ':DOSWin:M::MZ::/usr/bin/wine:' > /proc/sys/fs/binfmt_misc/register
           ./autogen.sh
-          mingw64-configure --without-gnutls-version-check CFLAGS=-g
+          ${{ matrix.arch }}-configure --without-gnutls-version-check CFLAGS=-g
           make -j4
           # Tests would fail without this as original HOME /github/home is not owned by the user.
           export HOME=$(cd ../home; pwd)
@@ -39,7 +46,8 @@ jobs:
       - name: Create Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: openconnect/openconnect-installer.exe
+          allowUpdates: true
+          artifacts: 'openconnect/openconnect-installer-*-${{ env.OPENCONNECT_VERSION }}.exe'
           artifactContentType: application/octet-stream
-          name: OpenConnect v${{ env.OPENCONNECT_VERSION }}
+          name: OpenConnect ${{ env.OPENCONNECT_VERSION }}
           token: ${{ secrets.GITHUB_TOKEN }}
