@@ -13,7 +13,7 @@ jobs:
       image: registry.gitlab.com/openconnect/build-images:openconnect-cli-mingw64
       options: --privileged
     env:
-      OPENCONNECT_VERSION: '8.20'
+      OPENCONNECT_VERSION: '9.10'
     steps:
       - name: Clone
         run: |
